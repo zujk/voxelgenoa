@@ -29,6 +29,18 @@ export class Streets {
     }));
   }
 
+  // one search entry per street: the anchor nearest the middle of its anchors, and how far they spread
+  places(): [string, number, number, number][] {
+    const by = new Map<string, Street[]>();
+    for (const s of this.all) { const a = by.get(s.name); if (a) a.push(s); else by.set(s.name, [s]); }
+    return [...by].map(([name, ss]) => {
+      const cx = ss.reduce((a, s) => a + s.p.x, 0) / ss.length, cz = ss.reduce((a, s) => a + s.p.z, 0) / ss.length;
+      const m = ss.reduce((a, s) => (Math.hypot(s.p.x - cx, s.p.z - cz) < Math.hypot(a.p.x - cx, a.p.z - cz) ? s : a));
+      const size = Math.max(40, ...ss.map((s) => Math.hypot(s.p.x - m.p.x, s.p.z - m.p.z)));
+      return [name, m.p.x, m.p.z, Math.min(size, 400)];
+    });
+  }
+
   update(camera: THREE.Camera, world: World | null, obstacles: Rect[]) {
     const now = performance.now(), c = camera.position;
     if (!world) return;

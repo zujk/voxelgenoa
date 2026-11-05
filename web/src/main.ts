@@ -15,13 +15,13 @@ import { Nav, type Mode, type Ride } from './nav/nav';
 import { makePost } from './post';
 import type { SearchItem } from './search';
 import { StreetLife } from './sim/life';
-import type { Kind, TrafficData } from './sim/types';
+import type { TrafficData } from './sim/types';
 import { TileStreamer } from './stream';
 import type { Facts, Label, Meta, Place, View } from './types';
 import { dateOf, dayOfYear, hourAt, solarNoon } from './sun';
 import { $, coarsePointer, ease, el, fetchJson, lerp } from './util';
 import { pkinLight } from './sky';
-import { type Climate, Precip, typical, type Weather, WEATHERS } from './weather';
+import { type Climate, typical, type Weather, WEATHERS } from './weather';
 import type { World } from './world';
 import { makeUniforms, makeVoxelMaterial, type BuildUniforms, type Engine, type ZoneUniforms } from './voxelMaterial';
 import './style.css';
@@ -46,9 +46,8 @@ const post = makePost(renderer, scene, camera);
 const daylight = new Daylight(renderer, scene, engine === 'zones' ? 2048 : 4096);
 const nav = new Nav(camera, controls, renderer.domElement, scene, (v) => flyTo(v), onMode);
 const bar = new Bar({ days: DAYS, weathers: ['typical', ...Object.keys(WEATHERS)], river: RIVER, onDay: (d) => { setDay(d); share(); },
-  onDayEnd: () => { if (weatherName === 'typical') setWeather('typical'); },
+  onDayEnd: () => {},
   onHour: (h) => { setHour(h); share(); }, onWeather: (w) => { setWeather(w); share(); }, onRiver: (cm) => flood?.setGauge(cm) });
-const precip = new Precip(scene);
 const map = new THREE.Box3();
 const tiltShift = qs.get('tilt') !== '0' && innerWidth >= 600 && (engine === 'city' || qs.get('tilt') === '1');
 let world: World | null = null, labels: Labels | null = null, hud: Hud | null = null, streets: Streets | null = null;
@@ -85,7 +84,7 @@ function pickEngine(): Engine {
 
 function makeRenderer() {
   const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
-  r.setPixelRatio(Math.min(devicePixelRatio, 2));
+  r.setPixelRatio(Math.min(devicePixelRatio, coarsePointer() ? 1.5 : 2));
   r.setSize(innerWidth, innerHeight);
   r.shadowMap.enabled = true;
   r.shadowMap.type = THREE.PCFShadowMap;
@@ -149,7 +148,7 @@ function offerWeathers(d: number) {
   if (!snow && weatherName === 'snow') setWeather('typical');
 }
 
-let weatherName = 'typical';
+let weatherName = 'clear';
 let fade: { from: Weather; to: Weather; t0: number } | null = null;
 function setWeather(name: string, now = false) {
   weatherName = name;
@@ -175,7 +174,7 @@ function share() {
     const d = dateOf(daylight.day);
     qs.set('date', `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
     qs.set('hour', daylight.hour.toFixed(2));
-    if (weatherName !== 'typical') qs.set('weather', weatherName); else qs.delete('weather');
+    qs.delete('weather');
     history.replaceState(null, '', `?${qs}`);
   }, 400);
 }
@@ -219,21 +218,10 @@ function onLabel(l: Label) {
   else goPlace(l.x, l.y, 60, null, l.name);
 }
 
-// moving trams are hard to click from the air: the nearest one to what you look at
-function followNearest(kind: Kind) {
-  const ag = life?.nearest(kind, focus(), null);
-  if (ag) nav.startRide(ag);
-}
-
 function searchItems(meta: Meta): SearchItem[] {
   return [
     ...Object.values(meta.views).map((v) => ({ name: v.label, kind: 'viewpoint', featured: true, go: () => goView(v) })),
     ...meta.labels.map((l) => ({ name: l.name, alt: [l.en, l.alt].join(' '), kind: l.kind, go: () => goPlace(l.x, l.y, Math.max(40, (l.R ?? 20) * 1.4), null, l.name) })),
-    { name: 'Follow a tram', alt: 'tramwaj tram ride follow jedź', kind: 'action', go: () => followNearest('tram') },
-    { name: 'Follow a car', alt: 'samochód car bus autobus ride follow jedź', kind: 'action', go: () => followNearest('car') },
-    { name: 'Zouk at Kopernik', alt: 'dance taniec zouk Centrum Nauki Kopernik evening wieczór', kind: 'action',
-      go: () => { if (daylight.hour < 19 || daylight.hour > 23) setHour(20.5); goPlace(2626, 2021, 30, { name: 'Zouk', kind: 'dancing in the evenings' }); } },
-    { name: 'Follow someone', alt: 'person people pieszy przechodzień idź walk with follow', kind: 'action', go: () => followNearest('person') },
   ];
 }
 
@@ -268,7 +256,7 @@ async function boot() {
   daylight.theta = (meta.theta_deg || 0) * Math.PI / 180;
   const md = qs.get('date')?.split('-').map(Number);
   setDay(md ? dayOfYear(new Date(new Date().getFullYear(), md[0] - 1, md[1])) : TODAY);
-  setWeather((qs.get('weather') ?? '') in WEATHERS ? qs.get('weather')! : 'typical', true);
+  setWeather('clear', true); // no weather in the Genoa fork: always a clear sky
   setHour(qs.get('hour') ? +qs.get('hour')! : timesOf(daylight.day)['golden hour']);
   if (engine === 'zones') {
     await (await import('./zones')).installZones({ streamer, uniforms: uniforms as typeof uniforms & ZoneUniforms, meta, focus, qs, composer: post.composer, n8: post.n8, camera });
@@ -279,19 +267,20 @@ async function boot() {
   labels = new Labels(meta.labels, onLabel);
   if (city) labels.gate = city.gate;
   const st = new Streets();
-  st.load('data/streets.json').then(() => { streets = st; }).catch((e) => console.warn('streets', e));
+  const stLoaded = st.load('data/streets.json').then(() => { streets = st; }).catch((e) => console.warn('streets', e));
   hud = new Hud(renderer.domElement, nav.mode);
   bar.search.setItems(searchItems(meta));
-  fetchJson<{ places: Place[] }>('data/places.json').then(({ places }) => bar.search.setItems([...searchItems(meta),
-    ...places.map(([name, kind, x, y, size, alt]) => ({ name, alt, kind, go: () => goPlace(x, y, size, { name, kind }) }))]));
+  Promise.all([fetchJson<{ places: Place[] }>('data/places.json'), stLoaded]).then(([{ places }]) => bar.search.setItems([...searchItems(meta),
+    ...places.map(([name, kind, x, y, size, alt]) => ({ name, alt, kind, go: () => goPlace(x, y, size, { name, kind }) })),
+    ...st.places().map(([name, x, y, size]) => ({ name, kind: 'street', go: () => goPlace(x, y, size, { name, kind: 'street' }) }))]));
   fountains = new Fountains(scene, meta.jets ?? []);
   flood = new Flood(scene, uniforms, meta);
   flood.load().then(() => { bar.river.input.disabled = false; flood!.setGauge(RIVER.typical); }).catch((e) => console.warn('flood', e));
-  fetchJson<TrafficData>('data/traffic.json').then((td) => {
+  fetchJson<TrafficData>('data/traffic.json').then((td) => { // Warsaw only: Genoa has no traffic data
     life = nav.life = new StreetLife(scene, td);
     life.world = world;
     window.__life = life;
-  });
+  }).catch(() => {});
   $('#loading').classList.add('hidden');
   window.__streamer = streamer;
   window.__ready = true;
@@ -316,7 +305,6 @@ renderer.setAnimationLoop((now) => {
   if (uniforms) { uniforms.uTime.value = t; pkinLight(daylight.day, t, uniforms.uPkinLight.value); }
   setWindows?.(daylight.hour, daylight.day);
   fountains?.update(t, daylight.night);
-  precip.update(t, camera.position, daylight.weather, daylight.night);
   if (city?.complete) document.body.classList.remove('loading');
   if (life) {
     life.group.visible = !city || city.complete;
@@ -338,12 +326,16 @@ renderer.setAnimationLoop((now) => {
 
 window.__three = { camera, controls, nav, bar, scene, renderer, flyTo, setHour, setDay, setWeather, map, daylight, post };
 
-// slow frames (the median of 15 over 45 ms): one pixel per CSS pixel
+// slow frames (the median of 30 over 33 ms, under 30 fps): fewer pixels, a step at a time down to one per CSS pixel,
+// then no ambient occlusion
 function adapt(dt: number) {
-  if (document.body.classList.contains('loading') || renderer.getPixelRatio() <= 1) return;
+  if (document.body.classList.contains('loading') || !post.n8.enabled) return;
   frames.push(dt);
-  if (frames.length < 15) return;
-  const median = frames.sort((a, b) => a - b)[7];
+  if (frames.length < 30) return;
+  const median = frames.sort((a, b) => a - b)[15];
   frames.length = 0;
-  if (median > 0.045) { renderer.setPixelRatio(1); onResize(); }
+  if (median <= 0.033) return;
+  const pr = renderer.getPixelRatio();
+  if (pr > 1) { renderer.setPixelRatio(Math.max(1, pr - 0.5)); onResize(); }
+  else post.n8.enabled = false;
 }

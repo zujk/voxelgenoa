@@ -83,6 +83,7 @@ export class Bar {
     this.time = new Slider(this.el, { min: 4, max: 23.5, step: 1 / 60, marks: {}, near: 1 / 3, log: false, show: hhmm, onInput: onHour });
     this.sky = choices('sky', 'Weather', weathers, this.el);
     this.sky.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest('button'); if (b) onWeather(b.dataset.v!); });
+    this.sky.style.display = 'none'; // no weather in the Genoa fork: always a clear sky
     this.river = new Slider(this.el, { min: Math.min(...Object.values(river)), max: 1150, step: 1, marks: river, near: 20, log: true, shift: 460, show: (cm) => `Vistula ${cm} cm`, onInput: onRiver });
     this.river.input.disabled = true;
     (this.river.input.closest('.row') as HTMLElement).style.display = 'none'; // no gauge for Genoa
