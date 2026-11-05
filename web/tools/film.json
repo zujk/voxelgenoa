@@ -1,0 +1,17 @@
+{
+  "query": "date=10-28&hour=15.58&weather=clear",
+  "seed": 2,
+  "shots": [
+    {"name": "loading", "sec": 8.5, "loading": true, "rate": 9, "rates": {"Landmarks": 7, "Buildings": 5, "Foliage": 16}, "fadeIn": 0, "followLoading": 420, "ui": ["bar"],
+     "keys": [[[640, 380, 1620], [749, 100, 1229]], [[300, 1050, 2550], [820, 40, 1150]]]},
+    {"name": "PKiN", "sec": 2.8, "orbit": [[749, 150, 1229], 380, 260, 40, 54]},
+    {"name": "BUW gardens", "sec": 2.8, "keys": [[[2280, 130, 660], [2385, 30, 535]], [[2306, 126, 652], [2389, 30, 531]]]},
+    {"name": "Kopernik and Most Świętokrzyski", "sec": 2.8, "keys": [[[2400, 200, 520], [2770, 25, 785]], [[2436, 196, 542], [2788, 25, 794]]]},
+    {"name": "PGE Narodowy", "sec": 2.8, "orbit": [[3714, 30, 1298], 820, 360, -70, -58]},
+    {"name": "Domki Fińskie", "sec": 2.8, "keys": [[[1772, 100, 2950], [1772, 38, 2790]], [[1748, 93, 2932], [1766, 36, 2792]]]},
+    {"name": "Złota", "sec": 10.5, "fadeOut": 1.0, "ui": ["hud"],
+     "ride": {"at": 3.0, "near": [1110, 1227], "within": 7, "heading": -1.5708, "minStep": 0.6, "swing": [0.7, 0.0], "swingUntil": 5.0, "face": -1.5708},
+     "keys_": [[5.1, "press", "Space"], [6.0, "down", "KeyW"], [7.6, "press", "Space"], [9.0, "up", "KeyW"]],
+     "keys": [[[1185, 95, 1236], [900, 70, 1236]], [[1112, 50, 1236], [1000, 46, 1236]]]}
+  ]
+}
