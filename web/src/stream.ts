@@ -208,7 +208,7 @@ export class TileStreamer implements ColumnSource {
     geo.computeBoundingBox(); geo.computeBoundingSphere();
     for (const a of Object.values(geo.attributes)) (a as THREE.BufferAttribute).onUpload(releaseArray); // culling only needs the bounding sphere
     const mesh = new THREE.Mesh(geo, this.material);
-    mesh.castShadow = mesh.receiveShadow = true;
+    mesh.castShadow = mesh.receiveShadow = false;
     mesh.visible = false;
     mesh.matrixAutoUpdate = false;
     this.group.add(mesh);

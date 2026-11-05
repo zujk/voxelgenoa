@@ -86,8 +86,7 @@ function makeRenderer() {
   const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
   r.setPixelRatio(Math.min(devicePixelRatio, coarsePointer() ? 1.5 : 2));
   r.setSize(innerWidth, innerHeight);
-  r.shadowMap.enabled = true;
-  r.shadowMap.type = THREE.PCFShadowMap;
+  r.shadowMap.enabled = false; // no sun shadows in the Genoa fork: the ambient occlusion shades the streets
   r.toneMapping = THREE.NoToneMapping;
   r.outputColorSpace = THREE.SRGBColorSpace;
   $('#app').appendChild(r.domElement);
@@ -312,7 +311,6 @@ renderer.setAnimationLoop((now) => {
   }
   daylight.sky.mesh.position.copy(camera.position);
   streamer?.update(camera);
-  daylight.fitShadow(focus(), camera, viewDist, map);
   post.composer.render();
   if (flood && now - riverT > 250) {
     riverT = now;

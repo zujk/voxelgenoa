@@ -26,7 +26,7 @@ export class Daylight {
 
   constructor(renderer: THREE.WebGLRenderer, private readonly scene: THREE.Scene, shadowSize = 8192) {
     const sun = this.sun, size = Math.min(shadowSize, renderer.capabilities.maxTextureSize);
-    sun.castShadow = true;
+    sun.castShadow = false; // shadows off (main.ts): no shadow map is allocated or drawn
     sun.shadow.mapSize.set(size, size);
     sun.shadow.bias = -0.0004;
     sun.shadow.radius = 3;
