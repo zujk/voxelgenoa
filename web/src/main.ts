@@ -18,7 +18,7 @@ import { StreetLife } from './sim/life';
 import type { TrafficData } from './sim/types';
 import { TileStreamer } from './stream';
 import type { Facts, Label, Meta, Place, View } from './types';
-import { dateOf, dayOfYear, hourAt, solarNoon } from './sun';
+import { dayOfYear, hourAt, solarNoon } from './sun';
 import { $, coarsePointer, ease, el, fetchJson, lerp } from './util';
 import { pkinLight } from './sky';
 import { type Climate, typical, type Weather, WEATHERS } from './weather';
@@ -34,6 +34,7 @@ declare global {
 const RIVER = { 'tiny creek': -355, 'record low': 104, typical: 185, '2010 flood': 879, '1844 flood': 963 }; // below the record, the estimated bed (scripts/flood.py)
 
 const TODAY = dayOfYear(new Date());
+const DAY = 135; // no date or time in the Genoa fork: always 15 May, at its golden hour
 const DAYS = { midsummer: 172, midwinter: 355, today: TODAY };
 
 const qs = new URLSearchParams(location.search);
@@ -170,9 +171,8 @@ let shareT = 0;
 function share() {
   clearTimeout(shareT);
   shareT = setTimeout(() => {
-    const d = dateOf(daylight.day);
-    qs.set('date', `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-    qs.set('hour', daylight.hour.toFixed(2));
+    qs.delete('date');
+    qs.delete('hour');
     qs.delete('weather');
     history.replaceState(null, '', `?${qs}`);
   }, 400);
@@ -253,10 +253,9 @@ async function boot() {
   daylight.bloom = post.bloom;
   daylight.ao = post.n8.configuration;
   daylight.theta = (meta.theta_deg || 0) * Math.PI / 180;
-  const md = qs.get('date')?.split('-').map(Number);
-  setDay(md ? dayOfYear(new Date(new Date().getFullYear(), md[0] - 1, md[1])) : TODAY);
+  setDay(DAY);
   setWeather('clear', true); // no weather in the Genoa fork: always a clear sky
-  setHour(qs.get('hour') ? +qs.get('hour')! : timesOf(daylight.day)['golden hour']);
+  setHour(timesOf(DAY)['golden hour']);
   if (engine === 'zones') {
     await (await import('./zones')).installZones({ streamer, uniforms: uniforms as typeof uniforms & ZoneUniforms, meta, focus, qs, composer: post.composer, n8: post.n8, camera });
     document.body.classList.remove('loading');

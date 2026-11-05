@@ -87,6 +87,7 @@ export class Bar {
     this.river = new Slider(this.el, { min: Math.min(...Object.values(river)), max: 1150, step: 1, marks: river, near: 20, log: true, shift: 460, show: (cm) => `Vistula ${cm} cm`, onInput: onRiver });
     this.river.input.disabled = true;
     (this.river.input.closest('.row') as HTMLElement).style.display = 'none'; // no gauge for Genoa
+    for (const s of [this.date, this.time]) (s.input.closest('.row') as HTMLElement).style.display = 'none'; // a fixed day and hour (main.ts)
   }
 
   setDay(d: number, times: Record<string, number>) { this.date.set(d); this.time.setMarks(times); }
