@@ -4,7 +4,7 @@ import type { Picked, StreetLife } from '../sim/life';
 import type { Pose } from '../sim/types';
 import type { TileStreamer } from '../stream';
 import type { View } from '../types';
-import { clamp, coarsePointer, ease } from '../util';
+import { clamp, ease } from '../util';
 import type { World } from '../world';
 import { rideCamera } from './ride';
 import { backOff, EYE, findStreet, openSpot, walkNet } from './spots';
@@ -207,20 +207,15 @@ export class Nav {
     return { p: r.ray.origin.clone().addScaledVector(r.ray.direction, t), axis: this.world.hitAxis, dir: r.ray.direction };
   }
 
-  private pickAgent(cx: number, cy: number, px: number, minPx: number) {
-    const life = this.life, world = this.world;
-    if (!life?.group.visible || !world) return null;
-    return life.pick(this.camera, cx, cy, px, minPx, (to) => { const L = to.length(); return world.raycast(this.camera.position, to.divideScalar(L), L) >= L - 2.5; }, this.ride?.obj ?? null);
-  }
-
-  // what a click would do here: a hand over people and vehicles, a ring on the street where you would walk
+  // what a click would do here: a ring on the street where you would walk (no people or vehicles to follow in the
+  // Genoa fork)
   private hover(cx: number, cy: number, type: string) {
     const now = performance.now();
     if (type === 'touch' || now - this.hoverT < 60 || now - this.quietT < 350) return;
     this.hoverT = now;
-    const air = this.mode === 'orbit', ag = this.pickAgent(cx, cy, air ? 14 : 3, air ? 7 : 0);
-    this.dom.style.cursor = ag ? 'pointer' : air ? 'grab' : 'default';
-    const g = this.mode === 'walk' && !ag ? this.walkTarget(cx, cy) : null;
+    const air = this.mode === 'orbit';
+    this.dom.style.cursor = air ? 'grab' : 'default';
+    const g = this.mode === 'walk' ? this.walkTarget(cx, cy) : null;
     this.marker.visible = !!g;
     if (g) this.marker.position.set(g.x, g.y + 0.06, g.z);
   }
@@ -235,11 +230,8 @@ export class Nav {
     return p;
   }
 
-  // a person or vehicle under the click is followed (generous from the air, tight on the street); else walk there
+  // a click at street level walks there
   private tap(cx: number, cy: number) {
-    const coarse = coarsePointer(), air = this.mode === 'orbit';
-    const ag = this.pickAgent(cx, cy, air ? (coarse ? 26 : 16) : coarse ? 24 : 12, air ? 5 : 0);
-    if (ag) { this.startRide(ag); return; }
     if (this.mode === 'ride') { this.hopOff(); return; }
     if (this.mode !== 'walk') return;
     const g = this.walkTarget(cx, cy);
