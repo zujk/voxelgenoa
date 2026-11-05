@@ -4,18 +4,12 @@ import { Bar } from './bar';
 import { Caption } from './caption';
 import { installCity } from './city';
 import { Daylight } from './daylight';
-import { Flood } from './flood';
-import { loadFoliage } from './foliage';
-import { loadWindows } from './windows';
-import { Fountains } from './fountains';
 import { Hud } from './hud';
 import { Labels } from './labels';
 import { Streets } from './streets';
 import { Nav, type Mode, type Ride } from './nav/nav';
 import { makePost } from './post';
 import type { SearchItem } from './search';
-import { StreetLife } from './sim/life';
-import type { TrafficData } from './sim/types';
 import { TileStreamer } from './stream';
 import type { Facts, Label, Meta, Place, View } from './types';
 import { dayOfYear, hourAt, solarNoon } from './sun';
@@ -27,14 +21,16 @@ import { makeUniforms, makeVoxelMaterial, type BuildUniforms, type Engine, type 
 import './style.css';
 
 declare global {
-  interface Window { __ready?: boolean; __three?: object; __life?: StreetLife; __streamer?: TileStreamer }
+  interface Window { __ready?: boolean; __three?: object; __streamer?: TileStreamer }
 }
 
 // Warszawa-Bulwary gauge, cm (scale since 1 Nov 2025)
 const RIVER = { 'tiny creek': -355, 'record low': 104, typical: 185, '2010 flood': 879, '1844 flood': 963 }; // below the record, the estimated bed (scripts/flood.py)
 
 const TODAY = dayOfYear(new Date());
-const DAY = 135; // no date or time in the Genoa fork: always 15 May, at its golden hour
+// no date or time in the Genoa fork: 15 May at 16:00, a sun high enough for clear, neutral colours and well before
+// dusk, so the night lighting (street lamps, lit windows) never runs
+const DAY = 135, HOUR = 16;
 const DAYS = { midsummer: 172, midwinter: 355, today: TODAY };
 
 const qs = new URLSearchParams(location.search);
@@ -43,22 +39,19 @@ const renderer = makeRenderer();
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(28, innerWidth / innerHeight, 0.5, 9000);
 const controls = makeControls();
-const post = makePost(renderer, scene, camera);
+const post = makePost(renderer, scene, camera, !coarsePointer());
 const daylight = new Daylight(renderer, scene, engine === 'zones' ? 2048 : 4096);
 const nav = new Nav(camera, controls, renderer.domElement, scene, (v) => flyTo(v), onMode);
 const bar = new Bar({ days: DAYS, weathers: ['typical', ...Object.keys(WEATHERS)], river: RIVER, onDay: (d) => { setDay(d); share(); },
   onDayEnd: () => {},
-  onHour: (h) => { setHour(h); share(); }, onWeather: (w) => { setWeather(w); share(); }, onRiver: (cm) => flood?.setGauge(cm) });
+  onHour: (h) => { setHour(h); share(); }, onWeather: (w) => { setWeather(w); share(); }, onRiver: () => {} });
 const map = new THREE.Box3();
-const tiltShift = qs.get('tilt') !== '0' && innerWidth >= 600 && (engine === 'city' || qs.get('tilt') === '1');
 let world: World | null = null, labels: Labels | null = null, hud: Hud | null = null, streets: Streets | null = null;
-let life: StreetLife | null = null, flood: Flood | null = null, fountains: Fountains | null = null;
 let city: Awaited<ReturnType<typeof installCity>> | null = null;
 let uniforms: ReturnType<typeof makeUniforms> | null = null, streamer: TileStreamer | null = null, views: Record<string, View> = {};
 let fly: ((now: number) => void) | null = null;
 let barRect: DOMRect | null = null;
 let climate: Climate | null = null;
-let setWindows: ((hour: number, day: number) => void) | null = null;
 
 nav.cancelFly = () => { fly = null; };
 bar.setRiver(RIVER.typical);
@@ -84,7 +77,7 @@ function pickEngine(): Engine {
 }
 
 function makeRenderer() {
-  const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+  const r = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
   r.setPixelRatio(Math.min(devicePixelRatio, coarsePointer() ? 1.5 : 2));
   r.setSize(innerWidth, innerHeight);
   r.shadowMap.enabled = false; // no sun shadows in the Genoa fork: the ambient occlusion shades the streets
@@ -239,9 +232,6 @@ async function boot() {
   [meta, climate] = await Promise.all([fetchJson<Meta>('data/meta.json'), fetchJson<Climate>('data/climate.json')]);
   views = meta.views;
   uniforms = makeUniforms(meta, engine);
-  loadFoliage(meta, uniforms).then((city) => bar.setDays({ 'leaves out': city.leaf, 'trees in colour': city.colour, 'leaves down': city.fall, ...DAYS }))
-    .catch((e) => console.warn('foliage', e));
-  loadWindows(meta, uniforms).then((set) => { setWindows = set; }).catch((e) => console.warn('windows', e));
   streamer = new TileStreamer(meta, makeVoxelMaterial(uniforms), scene);
   world = nav.world = streamer.world;
   nav.streamer = streamer;
@@ -255,7 +245,7 @@ async function boot() {
   daylight.theta = (meta.theta_deg || 0) * Math.PI / 180;
   setDay(DAY);
   setWeather('clear', true); // no weather in the Genoa fork: always a clear sky
-  setHour(timesOf(DAY)['golden hour']);
+  setHour(HOUR);
   if (engine === 'zones') {
     await (await import('./zones')).installZones({ streamer, uniforms: uniforms as typeof uniforms & ZoneUniforms, meta, focus, qs, composer: post.composer, n8: post.n8, camera });
     document.body.classList.remove('loading');
@@ -271,20 +261,12 @@ async function boot() {
   Promise.all([fetchJson<{ places: Place[] }>('data/places.json'), stLoaded]).then(([{ places }]) => bar.search.setItems([...searchItems(meta),
     ...places.map(([name, kind, x, y, size, alt]) => ({ name, alt, kind, go: () => goPlace(x, y, size, { name, kind }) })),
     ...st.places().map(([name, x, y, size]) => ({ name, kind: 'street', go: () => goPlace(x, y, size, { name, kind: 'street' }) }))]));
-  fountains = new Fountains(scene, meta.jets ?? []);
-  flood = new Flood(scene, uniforms, meta);
-  flood.load().then(() => { bar.river.input.disabled = false; flood!.setGauge(RIVER.typical); }).catch((e) => console.warn('flood', e));
-  fetchJson<TrafficData>('data/traffic.json').then((td) => { // Warsaw only: Genoa has no traffic data
-    life = nav.life = new StreetLife(scene, td);
-    life.world = world;
-    window.__life = life;
-  }).catch(() => {});
   $('#loading').classList.add('hidden');
   window.__streamer = streamer;
   window.__ready = true;
 }
 
-let lastT = performance.now(), riverT = 0, riverSeen = -1e9;
+let lastT = performance.now();
 const frames: number[] = [];
 const t0 = lastT;
 renderer.setAnimationLoop((now) => {
@@ -295,27 +277,14 @@ renderer.setAnimationLoop((now) => {
   adapt(dt);
   nav.update(dt);
   if (nav.mode === 'orbit') { controls.update(); nav.clamp(); keepInside(); }
-  const above = camera.position.y - (world ? world.groundAt(camera.position.x, camera.position.z) : 18) + 3;
-  post.setHeight(above, tiltShift, camera.position.distanceTo(controls.target));
   const viewDist = camera.position.distanceTo(controls.target);
   daylight.setFogFrom(viewDist);
   const t = (performance.now() - t0) / 1000;
   if (uniforms) { uniforms.uTime.value = t; pkinLight(daylight.day, t, uniforms.uPkinLight.value); }
-  setWindows?.(daylight.hour, daylight.day);
-  fountains?.update(t, daylight.night);
   if (city?.complete) document.body.classList.remove('loading');
-  if (life) {
-    life.group.visible = !city || city.complete;
-    if (life.group.visible) life.update(dt, daylight.hour, daylight.night, focus());
-  }
   daylight.sky.mesh.position.copy(camera.position);
   streamer?.update(camera);
   post.composer.render();
-  if (flood && now - riverT > 250) {
-    riverT = now;
-    if (flood.inView(camera, 2500) || Math.abs(bar.river.value - RIVER.typical) > 20) riverSeen = now;
-    bar.showRiver(now - riverSeen < 2000);
-  }
   barRect ??= bar.rect;
   labels?.update(camera, world, barRect, hud?.rects ?? []);
   streets?.update(camera, world, labels?.rects ?? []); // around the bar, the hud and the shown labels
