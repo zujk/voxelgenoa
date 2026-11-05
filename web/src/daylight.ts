@@ -7,7 +7,7 @@ import { visibility, WEATHERS, type Weather } from './weather';
 
 export class Daylight {
   hour = 0;
-  exposure = 1.15;
+  exposure = 1.2;
   day = 237;
   weather: Weather = WEATHERS.clear;
   night = 0;
@@ -57,7 +57,7 @@ export class Daylight {
     sun.shadow.radius = lerp(3, 22, cloud);
     sun.shadow.normalBias = clamp(0.3 / Math.max(light.y, 0.05), 0.5, 3);
     const skyRel = sky / 0.075 * adapt;
-    hemi.color.setRGB(0.63, 0.77, 1).lerp(new THREE.Color(1, 0.82, 0.66), golden * 0.45).lerp(new THREE.Color(0x46557a).lerp(new THREE.Color(0x4a443c), deep), night);
+    hemi.color.setRGB(0.86, 0.88, 1).lerp(new THREE.Color(1, 0.82, 0.66), golden * 0.45).lerp(new THREE.Color(0x46557a).lerp(new THREE.Color(0x4a443c), deep), night);
     hemi.groundColor.copy(sun.color).multiplyScalar(0.4).lerp(new THREE.Color(0x4a3c2c), night);
     hemi.intensity = lerp(0.14 * skyRel, lerp(0.95, 0.5, deep), night);
     if (cloud > 0) {
@@ -76,7 +76,7 @@ export class Daylight {
       this.uniforms.uDay.value = this.day;
     }
     if (this.bloom) this.bloom.intensity = lerp(0.15, 0.9, night);
-    if (this.ao) Object.assign(this.ao, { intensity: lerp(2.2, 3.4, cloud * day), aoRadius: lerp(6, 9, cloud * day) });
+    if (this.ao) Object.assign(this.ao, { intensity: lerp(1.5, 3.4, cloud * day), aoRadius: lerp(5, 9, cloud * day) });
     this.scene.fog = new THREE.Fog(this.sky.horizon.clone(), 2500, 7000);
     const key = `${(elDeg / 0.6).toFixed(0)},${cloud.toFixed(1)}`;
     if (key !== this.envKey) {
@@ -86,6 +86,12 @@ export class Daylight {
       this.envKey = key;
     }
     this.scene.environmentIntensity = lerp(lerp(0.38 * Math.min(skyRel, 2), 0.9 * smooth(-4, 6, elDeg), cloud), lerp(0.55, 0.3, deep), night);
+    // no cast shadows in the Genoa fork, so a softer key-to-fill ratio: the faces away from the sun get more sky
+    // and the sun a little less, and the colours of every facade read in daylight
+    const fill = 1 - night;
+    sun.intensity *= lerp(1, 0.85, fill);
+    hemi.intensity = lerp(hemi.intensity, Math.max(hemi.intensity, 1.0), fill);
+    this.scene.environmentIntensity = lerp(this.scene.environmentIntensity, Math.max(this.scene.environmentIntensity, 0.6), fill);
     const e = lerp(this.exposure, 1, night);
     sun.intensity *= e; hemi.intensity *= e; this.scene.environmentIntensity *= e;
   }

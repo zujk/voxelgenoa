@@ -234,8 +234,8 @@ const SURFACE = `
       if (m == ${MAT.CONCRETE}) win = shop && mod(u, 4.0) > 0.5;
       if (shop && m == ${MAT.WALL}) win = mod(u, 5.0) > 0.5 && lvl > 0.5;
       if (win) {
-        col = mix(base * 0.42, vec3(0.10, 0.13, 0.17), 0.55) + 0.025 * h;
-        gRough = 0.12; gMetal = 0.6;
+        col = mix(base * 0.62, vec3(0.26, 0.32, 0.38), 0.45) + 0.025 * h; // lighter panes in the Genoa fork
+        gRough = 0.12; gMetal = 0.35;
         vec2 room = vec2(floor(u / 4.0) + wpos * 17.31 + vN.x * 3.1, floor(lvl / 3.0) + vN.z * 5.7);
         if (shop) {
           if (hash12(vec2(floor(u / 6.0), wpos * 3.7)) < 0.8) gEmissive = vec3(1.0, 0.8, 0.55) * 1.5 * uNight;
@@ -262,8 +262,8 @@ const SURFACE = `
       float fl = mod(lvl, 4.0);
       bool win = inBay && (ground ? lvl > 0.5 && lvl < 3.0 : fl > 0.5 && fl < 2.5);
       if (win) {
-        col = mix(base * 0.42, vec3(0.10, 0.13, 0.17), 0.55) + 0.025 * h;
-        gRough = 0.12; gMetal = 0.6;
+        col = mix(base * 0.62, vec3(0.26, 0.32, 0.38), 0.45) + 0.025 * h; // lighter panes in the Genoa fork
+        gRough = 0.12; gMetal = 0.35;
         vec2 room = vec2(floor(u / 6.0) + wpos * 17.31 + vN.x * 3.1, floor(lvl / 4.0) + vN.z * 5.7);
         if (ground) { if (hash12(vec2(floor(u / 6.0), wpos * 3.7)) < 0.7) gEmissive = vec3(1.0, 0.8, 0.55) * 1.4 * uNight; }
         else gEmissive = windowLight(cell, room, floor(lvl / 4.0)) * uNight;
@@ -301,7 +301,7 @@ const SURFACE = `
     col = base * mix(vec3(1.0), grassTint(), smoothstep(0.02, 0.08, base.g - max(base.r, base.b))) * (0.88 + 0.2 * h); gRough = 1.0;
   } else if (m == ${MAT.WATER}) {
     float r = sin(cell.x * 0.9) * sin(cell.z * 1.1) * 0.5 + 0.5; // still water in the Genoa fork: no ripples, no glints
-    col = mix(vec3(0.012, 0.085, 0.15), vec3(0.03, 0.2, 0.26), r * r) * (0.94 + 0.12 * h); gRough = 0.04; gMetal = 0.3;
+    col = mix(vec3(0.025, 0.14, 0.26), vec3(0.05, 0.24, 0.34), r * r) * (0.94 + 0.12 * h); gRough = 0.04; gMetal = 0.3;
     vec3 V = normalize(cameraPosition - vVox);
     float fres = 1.0 - clamp(dot(vN, V), 0.0, 1.0); fres *= fres; fres *= fres;
     col = mix(col, uHorizon * 0.8, clamp(0.08 + 0.55 * fres, 0.0, 0.55));
@@ -376,7 +376,9 @@ const SURFACE = `
     else gEmissive += col * lm * fall * uNight * 2.2 * up;
   }
   if (m != ${MAT.LAMP} && m != ${MAT.JET} && m != ${MAT.SIGN}) col *= mix(1.0, uAlbedo, smoothstep(0.2, 0.6, dot(col, vec3(0.2126, 0.7152, 0.0722))));
-  diffuseColor.rgb = col * mix(0.62, 1.0, vAO);
+  // the Genoa fork's sunnier palette: a gamma lift brightens the dark facades and greens more than the light ones, hue kept
+  if (m != ${MAT.LAMP} && m != ${MAT.JET} && m != ${MAT.SIGN} && m != ${MAT.WATER}) { vec3 lift = sqrt(col) * 0.66; col = mix(col, mix(lift, vec3(dot(lift, vec3(0.2126, 0.7152, 0.0722))), 0.25), 0.4); }
+  diffuseColor.rgb = col * mix(0.72, 1.0, vAO);
   if (vHide > 0.5) { diffuseColor.rgb = vec3(0.42, 0.41, 0.39); gEmissive = vec3(0.0); }
   #ifdef ZONES
   #ifdef CLAY

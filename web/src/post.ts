@@ -10,11 +10,11 @@ export function makePost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, came
   const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
   composer.addPass(new RenderPass(scene, camera));
   const n8 = new N8AOPostPass(scene, camera, innerWidth, innerHeight);
-  Object.assign(n8.configuration, { aoRadius: 6, distanceFalloff: 1.5, intensity: 2.2, halfRes: true, depthAwareUpsampling: true });
+  Object.assign(n8.configuration, { aoRadius: 5, distanceFalloff: 1.5, intensity: 1.5, halfRes: true, depthAwareUpsampling: true });
   composer.addPass(n8);
   const bloom = new BloomEffect({ intensity: 0.2, luminanceThreshold: 0.92, luminanceSmoothing: 0.15, mipmapBlur: true, radius: 0.55 });
-  const grade: Effect[] = [tone, new HueSaturationEffect({ saturation: 0.12 }), new BrightnessContrastEffect({ brightness: 0, contrast: 0.06 }),
-    new VignetteEffect({ offset: 0.3, darkness: 0.45 })];
+  const grade: Effect[] = [tone, new HueSaturationEffect({ saturation: 0.14 }), new BrightnessContrastEffect({ brightness: 0.03, contrast: 0.02 }),
+    new VignetteEffect({ offset: 0.35, darkness: 0.22 })];
   if (smaa) grade.push(new SMAAEffect());
   composer.addPass(new EffectPass(camera, ...grade));
   return { composer, n8, bloom, tone };
