@@ -660,10 +660,25 @@ def main():
     rgb = colors[np.where(bid > 0, brpal, spal)][:ch * 2:2, :cw * 2:2]
     with gzip.open(OUT / "terrain.bin", "wb", 9) as f:
         f.write(hd[::4, ::4][:th, :tw].astype("<u2").tobytes() + rgb.tobytes())
+    # city blocks for phones (web/src/zones.ts, ?shape=budget: the 1 m city around the focus, clay beyond): 64 m
+    # squares, each building whole in the square of its centre so the real area never cuts one in two
+    BS = 64
+    nbx = -(-W // BS)
+    blk = ((np.arange(D)[:, None] // BS) * nbx + np.arange(W)[None, :] // BS + 1).astype(np.uint16)
+    bblk = np.zeros(len(zones) + 1, np.uint16)
+    blocks = [[(c + 0.5) * BS, (r + 0.5) * BS, 1, c * BS, r * BS, min((c + 1) * BS, W), min((r + 1) * BS, D), BS * BS // 2]
+              for r in range(-(-D // BS)) for c in range(nbx)]
+    for n, z in enumerate(zones, 1):  # [cx, cy, n, x0, y0, x1, y1, triangles]
+        b = (z[1] // BS) * nbx + z[0] // BS
+        bblk[n] = b + 1
+        B = blocks[b]
+        B[3], B[4], B[5], B[6] = min(B[3], z[3]), min(B[4], z[4]), max(B[5], z[5]), max(B[6], z[6])
+        B[7] += z[7]
+    blk[bid > 0] = bblk[bid[bid > 0]]
     with gzip.open(OUT / "zones.bin", "wb", 6) as f:
-        f.write(np.zeros((D, W), "<u2").tobytes() + bid.astype("<u2").tobytes())
-    json.dump({"blocks": [], "buildings": zones}, open(OUT / "zones.json", "w"))
-    note("terrain, zones")
+        f.write(blk.astype("<u2").tobytes() + bid.astype("<u2").tobytes())
+    json.dump({"blocks": blocks, "buildings": zones}, open(OUT / "zones.json", "w"))
+    note(f"terrain, zones ({len(blocks)} blocks)")
 
     # ---------- tiles
     keep_ids = ()
